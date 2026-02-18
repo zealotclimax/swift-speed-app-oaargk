@@ -1,11 +1,10 @@
 
-import { HeaderRightButton, HeaderLeftButton } from "@/components/HeaderButtons";
 import { useTheme } from "@react-navigation/native";
 import { StyleSheet, View, Text, TouchableOpacity, Alert } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import * as Location from "expo-location";
-import Svg, { Circle, Path } from "react-native-svg";
+import Svg, { Circle } from "react-native-svg";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -30,13 +29,17 @@ export default function HomeScreen() {
     return () => {
       if (locationSubscription.current) {
         console.log("Cleaning up location subscription");
-        locationSubscription.current.remove();
+        try {
+          locationSubscription.current.remove();
+        } catch (error) {
+          console.log("Error removing subscription:", error);
+        }
       }
     };
   }, []);
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
-    const R = 6371e3; // Earth radius in meters
+    const R = 6371e3;
     const φ1 = (lat1 * Math.PI) / 180;
     const φ2 = (lat2 * Math.PI) / 180;
     const Δφ = ((lat2 - lat1) * Math.PI) / 180;
@@ -47,7 +50,7 @@ export default function HomeScreen() {
       Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
     const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 
-    return R * c; // Distance in meters
+    return R * c;
   };
 
   const startTracking = async () => {
@@ -69,17 +72,14 @@ export default function HomeScreen() {
           distanceInterval: 1,
         },
         (location) => {
-          console.log("Location update received:", location.coords.speed);
+          console.log("Location update received");
           
-          // Update speed (convert m/s to km/h)
           const speedInKmh = location.coords.speed ? location.coords.speed * 3.6 : 0;
           setSpeed(Math.max(0, speedInKmh));
 
-          // Update altitude
           const altitudeValue = location.coords.altitude || 0;
           setAltitude(altitudeValue);
 
-          // Calculate distance
           if (lastPosition.current) {
             const distanceIncrement = calculateDistance(
               lastPosition.current.latitude,
@@ -106,8 +106,12 @@ export default function HomeScreen() {
   const stopTracking = () => {
     console.log("Stopping GPS tracking");
     if (locationSubscription.current) {
-      locationSubscription.current.remove();
-      locationSubscription.current = null;
+      try {
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
+      } catch (error) {
+        console.log("Error stopping tracking:", error);
+      }
     }
     setIsTracking(false);
     lastPosition.current = null;
@@ -121,13 +125,10 @@ export default function HomeScreen() {
     <>
       <Stack.Screen
         options={{
-          title: "Speed Tracker",
-          headerRight: () => <HeaderRightButton />,
-          headerLeft: () => <HeaderLeftButton />,
+          headerShown: false,
         }}
       />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
-        {/* Altitude at top */}
         <View style={styles.altitudeContainer}>
           <Text style={[styles.altitudeLabel, { color: colors.text }]}>Altitude</Text>
           <Text style={[styles.altitudeValue, { color: colors.text }]}>
@@ -136,7 +137,6 @@ export default function HomeScreen() {
           <Text style={[styles.altitudeUnit, { color: colors.text }]}>m</Text>
         </View>
 
-        {/* Circular Speedometer */}
         <View style={styles.speedometerContainer}>
           <Speedometer speed={speedDisplay} maxSpeed={200} color={colors.primary} />
           <View style={styles.speedTextContainer}>
@@ -147,7 +147,6 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        {/* Bottom controls */}
         <View style={styles.bottomContainer}>
           <TouchableOpacity
             style={[
@@ -199,15 +198,11 @@ function Speedometer({ speed, maxSpeed, color }: SpeedometerProps) {
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   
-  // Calculate progress (0 to 1)
   const progress = Math.min(speed / maxSpeed, 1);
-  
-  // Calculate stroke dash offset for progress arc
-  const progressOffset = circumference * (1 - progress * 0.75); // 0.75 = 270 degrees
+  const progressOffset = circumference * (1 - progress * 0.75);
 
   return (
     <Svg width={size} height={size} style={styles.speedometer}>
-      {/* Background circle (gray) */}
       <Circle
         cx={size / 2}
         cy={size / 2}
@@ -220,7 +215,6 @@ function Speedometer({ speed, maxSpeed, color }: SpeedometerProps) {
         strokeLinecap="round"
       />
       
-      {/* Progress circle (colored) */}
       <Circle
         cx={size / 2}
         cy={size / 2}
@@ -242,6 +236,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingVertical: 40,
+    paddingTop: 60,
   },
   altitudeContainer: {
     alignItems: "center",
