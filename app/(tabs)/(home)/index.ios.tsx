@@ -4,7 +4,7 @@ import { StyleSheet, View, Text, Alert, TouchableOpacity } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import * as Location from "expo-location";
-import Svg, { Circle, Line, Text as SvgText, Path, Defs, RadialGradient, Stop } from "react-native-svg";
+import Svg, { Circle, Line, Text as SvgText, Path } from "react-native-svg";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -142,37 +142,31 @@ export default function HomeScreen() {
           headerShown: false,
         }}
       />
-      <View style={[styles.container, { backgroundColor: '#000000' }]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <View style={styles.altitudeContainer}>
-          <Text style={styles.altitudeLabel}>Altitude</Text>
-          <Text style={styles.altitudeValue}>
+          <Text style={[styles.altitudeLabel, { color: colors.text }]}>Altitude</Text>
+          <Text style={[styles.altitudeValue, { color: colors.text }]}>
             {altitudeDisplay}
           </Text>
-          <Text style={styles.altitudeUnit}>m</Text>
+          <Text style={[styles.altitudeUnit, { color: colors.text }]}>m</Text>
         </View>
 
         <View style={styles.speedometerContainer}>
-          <Speedometer speed={speedDisplay} maxSpeed={240} />
+          <Speedometer speed={speedDisplay} maxSpeed={150} color={colors.primary} textColor={colors.text} />
           <View style={styles.speedTextContainer}>
-            <Text style={styles.speedValue}>
+            <Text style={[styles.speedValue, { color: colors.text }]}>
               {speedDisplay}
             </Text>
-            <Text style={styles.speedUnit}>km/h</Text>
+            <Text style={[styles.speedUnit, { color: colors.text }]}>km/h</Text>
           </View>
         </View>
 
-        <View style={styles.bottomInfoContainer}>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoLabel}>TRIP A</Text>
-            <Text style={styles.infoValue}>0.0 km</Text>
-          </View>
-          <View style={styles.infoBox}>
-            <Text style={styles.infoLabel}>TOTAL</Text>
-            <Text style={styles.infoValue}>
-              {distanceDisplay}
-            </Text>
-            <Text style={styles.infoUnit}>km</Text>
-          </View>
+        <View style={styles.distanceContainer}>
+          <Text style={[styles.distanceLabel, { color: colors.text }]}>Distance</Text>
+          <Text style={[styles.distanceValue, { color: colors.text }]}>
+            {distanceDisplay}
+          </Text>
+          <Text style={[styles.distanceUnit, { color: colors.text }]}>km</Text>
         </View>
 
         <View style={styles.buttonContainer}>
@@ -200,12 +194,15 @@ export default function HomeScreen() {
 interface SpeedometerProps {
   speed: number;
   maxSpeed: number;
+  color: string;
+  textColor: string;
 }
 
-function Speedometer({ speed, maxSpeed }: SpeedometerProps) {
-  const size = 380;
-  const strokeWidth = 32;
-  const radius = (size - strokeWidth) / 2 - 10;
+function Speedometer({ speed, maxSpeed, color, textColor }: SpeedometerProps) {
+  const size = 360;
+  const strokeWidth = 28;
+  const radius = (size - strokeWidth) / 2;
+  const circumference = 2 * Math.PI * radius;
   
   const startAngle = 210;
   const endAngle = 330;
@@ -217,15 +214,15 @@ function Speedometer({ speed, maxSpeed }: SpeedometerProps) {
   const centerY = size / 2;
   
   const tickMarks = [];
-  const speedLabels = [];
+  const speedLabels = [0, 30, 60, 90, 120, 150];
   
-  for (let i = 0; i <= 240; i += 10) {
-    const angle = startAngle + (i / 240) * angleRange;
+  for (let i = 0; i <= 150; i += 10) {
+    const angle = startAngle + (i / 150) * angleRange;
     const angleRad = (angle * Math.PI) / 180;
     
-    const isMainTick = i % 20 === 0;
-    const tickLength = isMainTick ? 20 : 12;
-    const tickWidth = isMainTick ? 2.5 : 1.5;
+    const isMainTick = i % 30 === 0;
+    const tickLength = isMainTick ? 24 : 14;
+    const tickWidth = isMainTick ? 3 : 2;
     
     const innerRadius = radius - tickLength;
     const outerRadius = radius;
@@ -242,40 +239,37 @@ function Speedometer({ speed, maxSpeed }: SpeedometerProps) {
         y1={y1}
         x2={x2}
         y2={y2}
-        stroke="#FFFFFF"
+        stroke={textColor}
         strokeWidth={tickWidth}
-        opacity={0.9}
+        opacity={0.6}
       />
     );
-    
-    if (i % 20 === 0) {
-      const labelRadius = radius - 38;
-      const x = centerX + labelRadius * Math.cos(angleRad);
-      const y = centerY + labelRadius * Math.sin(angleRad);
-      
-      speedLabels.push(
-        <SvgText
-          key={`label-${i}`}
-          x={x}
-          y={y}
-          fill="#FFFFFF"
-          fontSize="16"
-          fontWeight="600"
-          textAnchor="middle"
-          alignmentBaseline="middle"
-          opacity={0.95}
-        >
-          {i}
-        </SvgText>
-      );
-    }
   }
   
-  const kmhLabelAngle = 90;
-  const kmhLabelRad = (kmhLabelAngle * Math.PI) / 180;
-  const kmhLabelRadius = radius - 60;
-  const kmhX = centerX + kmhLabelRadius * Math.cos(kmhLabelRad);
-  const kmhY = centerY + kmhLabelRadius * Math.sin(kmhLabelRad);
+  const speedLabelElements = speedLabels.map((labelSpeed) => {
+    const angle = startAngle + (labelSpeed / 150) * angleRange;
+    const angleRad = (angle * Math.PI) / 180;
+    const labelRadius = radius - 45;
+    
+    const x = centerX + labelRadius * Math.cos(angleRad);
+    const y = centerY + labelRadius * Math.sin(angleRad);
+    
+    return (
+      <SvgText
+        key={`label-${labelSpeed}`}
+        x={x}
+        y={y}
+        fill={textColor}
+        fontSize="18"
+        fontWeight="700"
+        textAnchor="middle"
+        alignmentBaseline="middle"
+        opacity={0.8}
+      >
+        {labelSpeed}
+      </SvgText>
+    );
+  });
 
   const polarToCartesian = (centerX: number, centerY: number, radius: number, angleInDegrees: number) => {
     const angleInRadians = (angleInDegrees * Math.PI) / 180.0;
@@ -294,34 +288,21 @@ function Speedometer({ speed, maxSpeed }: SpeedometerProps) {
 
   const backgroundPath = describeArc(centerX, centerY, radius, startAngle, endAngle);
 
+  const getSpeedColor = (currentSpeed: number) => {
+    if (currentSpeed <= 40) return '#4CAF50';
+    if (currentSpeed <= 110) return '#FFC107';
+    return '#F44336';
+  };
+
   const currentSpeedAngle = startAngle + progress * angleRange;
   const progressPath = describeArc(centerX, centerY, radius, startAngle, currentSpeedAngle);
-
-  const needleAngle = startAngle + progress * angleRange;
-  const needleRad = (needleAngle * Math.PI) / 180;
-  const needleLength = radius - 30;
-  const needleX = centerX + needleLength * Math.cos(needleRad);
-  const needleY = centerY + needleLength * Math.sin(needleRad);
+  const speedColor = getSpeedColor(speed);
 
   return (
     <Svg width={size} height={size} style={styles.speedometer}>
-      <Defs>
-        <RadialGradient id="dialGradient" cx="50%" cy="50%" r="50%">
-          <Stop offset="0%" stopColor="#1a1a1a" stopOpacity="1" />
-          <Stop offset="100%" stopColor="#000000" stopOpacity="1" />
-        </RadialGradient>
-      </Defs>
-      
-      <Circle
-        cx={centerX}
-        cy={centerY}
-        r={radius + 20}
-        fill="url(#dialGradient)"
-      />
-      
       <Path
         d={backgroundPath}
-        stroke="#2a2a2a"
+        stroke="#333"
         strokeWidth={strokeWidth}
         fill="none"
         strokeLinecap="round"
@@ -329,51 +310,14 @@ function Speedometer({ speed, maxSpeed }: SpeedometerProps) {
       
       <Path
         d={progressPath}
-        stroke="#E53935"
+        stroke={speedColor}
         strokeWidth={strokeWidth}
         fill="none"
         strokeLinecap="round"
       />
       
       {tickMarks}
-      {speedLabels}
-      
-      <SvgText
-        x={kmhX}
-        y={kmhY}
-        fill="#FFFFFF"
-        fontSize="14"
-        fontWeight="500"
-        textAnchor="middle"
-        alignmentBaseline="middle"
-        opacity={0.7}
-      >
-        km/h
-      </SvgText>
-      
-      <Line
-        x1={centerX}
-        y1={centerY}
-        x2={needleX}
-        y2={needleY}
-        stroke="#E53935"
-        strokeWidth={3}
-        strokeLinecap="round"
-      />
-      
-      <Circle
-        cx={centerX}
-        cy={centerY}
-        r={8}
-        fill="#E53935"
-      />
-      
-      <Circle
-        cx={centerX}
-        cy={centerY}
-        r={4}
-        fill="#000000"
-      />
+      {speedLabelElements}
     </Svg>
   );
 }
@@ -390,18 +334,17 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   altitudeLabel: {
-    fontSize: 14,
-    color: '#999999',
+    fontSize: 16,
+    opacity: 0.7,
     marginBottom: 4,
   },
   altitudeValue: {
-    fontSize: 24,
+    fontSize: 28,
     fontWeight: "700",
-    color: '#FFFFFF',
   },
   altitudeUnit: {
-    fontSize: 14,
-    color: '#999999',
+    fontSize: 16,
+    opacity: 0.7,
     marginTop: 2,
   },
   speedometerContainer: {
@@ -415,44 +358,33 @@ const styles = StyleSheet.create({
     position: "absolute",
     alignItems: "center",
     justifyContent: "center",
-    top: 180,
   },
   speedValue: {
-    fontSize: 90,
+    fontSize: 110,
     fontWeight: "bold",
-    letterSpacing: -2,
-    color: '#FFFFFF',
+    letterSpacing: -3,
   },
   speedUnit: {
-    fontSize: 20,
-    color: '#999999',
-    marginTop: 0,
-    fontWeight: "500",
-  },
-  bottomInfoContainer: {
-    flexDirection: "row",
-    justifyContent: "center",
-    alignItems: "center",
-    gap: 40,
-    marginTop: -20,
-  },
-  infoBox: {
-    alignItems: "center",
-  },
-  infoLabel: {
-    fontSize: 11,
-    color: '#999999',
-    marginBottom: 4,
-    letterSpacing: 0.5,
-  },
-  infoValue: {
-    fontSize: 16,
+    fontSize: 32,
+    opacity: 0.7,
+    marginTop: 4,
     fontWeight: "600",
-    color: '#FFFFFF',
   },
-  infoUnit: {
-    fontSize: 11,
-    color: '#999999',
+  distanceContainer: {
+    alignItems: "center",
+  },
+  distanceLabel: {
+    fontSize: 16,
+    opacity: 0.7,
+    marginBottom: 4,
+  },
+  distanceValue: {
+    fontSize: 48,
+    fontWeight: "bold",
+  },
+  distanceUnit: {
+    fontSize: 18,
+    opacity: 0.7,
     marginTop: 2,
   },
   buttonContainer: {
@@ -470,7 +402,7 @@ const styles = StyleSheet.create({
     minWidth: 120,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: "#1a1a1a",
+    backgroundColor: "#333",
   },
   startButton: {
     marginRight: "auto",
