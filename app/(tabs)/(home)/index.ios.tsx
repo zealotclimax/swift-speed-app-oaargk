@@ -1,10 +1,10 @@
 
 import { useTheme } from "@react-navigation/native";
-import { StyleSheet, View, Text, TouchableOpacity, Alert } from "react-native";
+import { StyleSheet, View, Text, Alert } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import * as Location from "expo-location";
-import Svg, { Circle } from "react-native-svg";
+import Svg, { Circle, Line, Text as SvgText } from "react-native-svg";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -18,12 +18,18 @@ export default function HomeScreen() {
   const lastPosition = useRef<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
-    console.log("Requesting location permissions");
+    console.log("Requesting location permissions and starting tracking");
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       const permissionGranted = status === "granted";
       setHasPermission(permissionGranted);
       console.log("Location permission granted:", permissionGranted);
+      
+      if (permissionGranted) {
+        startTracking();
+      } else {
+        Alert.alert("Permission Required", "Location permission is required to track speed and distance.");
+      }
     })();
 
     return () => {
@@ -54,40 +60,50 @@ export default function HomeScreen() {
   };
 
   const startTracking = async () => {
-    if (!hasPermission) {
-      Alert.alert("Permission Required", "Location permission is required to track speed.");
-      return;
-    }
-
     console.log("Starting GPS tracking");
     setIsTracking(true);
     lastPosition.current = null;
     setDistance(0);
+    setSpeed(0);
 
     try {
       locationSubscription.current = await Location.watchPositionAsync(
         {
           accuracy: Location.Accuracy.BestForNavigation,
           timeInterval: 1000,
-          distanceInterval: 1,
+          distanceInterval: 0.5,
         },
         (location) => {
-          console.log("Location update received");
+          console.log("Location update:", {
+            speed: location.coords.speed,
+            altitude: location.coords.altitude,
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          });
           
-          const speedInKmh = location.coords.speed ? location.coords.speed * 3.6 : 0;
-          setSpeed(Math.max(0, speedInKmh));
+          const speedInMps = location.coords.speed !== null && location.coords.speed >= 0 
+            ? location.coords.speed 
+            : 0;
+          const speedInKmh = speedInMps * 3.6;
+          setSpeed(Math.max(0, Math.round(speedInKmh)));
+          console.log("Speed calculated:", speedInKmh, "km/h");
 
           const altitudeValue = location.coords.altitude || 0;
-          setAltitude(altitudeValue);
+          setAltitude(Math.round(altitudeValue));
 
-          if (lastPosition.current) {
+          if (lastPosition.current && speedInMps > 0.5) {
             const distanceIncrement = calculateDistance(
               lastPosition.current.latitude,
               lastPosition.current.longitude,
               location.coords.latitude,
               location.coords.longitude
             );
-            setDistance((prev) => prev + distanceIncrement);
+            console.log("Distance increment:", distanceIncrement, "meters");
+            setDistance((prev) => {
+              const newDistance = prev + distanceIncrement;
+              console.log("Total distance:", newDistance / 1000, "km");
+              return newDistance;
+            });
           }
 
           lastPosition.current = {
@@ -96,6 +112,7 @@ export default function HomeScreen() {
           };
         }
       );
+      console.log("Location tracking started successfully");
     } catch (error) {
       console.error("Error starting location tracking:", error);
       Alert.alert("Error", "Failed to start GPS tracking");
@@ -103,22 +120,8 @@ export default function HomeScreen() {
     }
   };
 
-  const stopTracking = () => {
-    console.log("Stopping GPS tracking");
-    if (locationSubscription.current) {
-      try {
-        locationSubscription.current.remove();
-        locationSubscription.current = null;
-      } catch (error) {
-        console.log("Error stopping tracking:", error);
-      }
-    }
-    setIsTracking(false);
-    lastPosition.current = null;
-  };
-
-  const speedDisplay = Math.round(speed);
-  const altitudeDisplay = Math.round(altitude);
+  const speedDisplay = speed;
+  const altitudeDisplay = altitude;
   const distanceDisplay = (distance / 1000).toFixed(2);
 
   return (
@@ -138,7 +141,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.speedometerContainer}>
-          <Speedometer speed={speedDisplay} maxSpeed={200} color={colors.primary} />
+          <Speedometer speed={speedDisplay} maxSpeed={200} color={colors.primary} textColor={colors.text} />
           <View style={styles.speedTextContainer}>
             <Text style={[styles.speedValue, { color: colors.text }]}>
               {speedDisplay}
@@ -147,39 +150,12 @@ export default function HomeScreen() {
           </View>
         </View>
 
-        <View style={styles.bottomContainer}>
-          <TouchableOpacity
-            style={[
-              styles.button,
-              styles.startButton,
-              { backgroundColor: isTracking ? "#666" : "#4CAF50" },
-              !hasPermission && styles.disabledButton,
-            ]}
-            onPress={startTracking}
-            disabled={isTracking || !hasPermission}
-          >
-            <Text style={styles.buttonText}>START</Text>
-          </TouchableOpacity>
-
-          <View style={styles.distanceContainer}>
-            <Text style={[styles.distanceLabel, { color: colors.text }]}>Distance</Text>
-            <Text style={[styles.distanceValue, { color: colors.text }]}>
-              {distanceDisplay}
-            </Text>
-            <Text style={[styles.distanceUnit, { color: colors.text }]}>km</Text>
-          </View>
-
-          <TouchableOpacity
-            style={[
-              styles.button,
-              styles.stopButton,
-              { backgroundColor: isTracking ? "#F44336" : "#666" },
-            ]}
-            onPress={stopTracking}
-            disabled={!isTracking}
-          >
-            <Text style={styles.buttonText}>STOP</Text>
-          </TouchableOpacity>
+        <View style={styles.distanceContainer}>
+          <Text style={[styles.distanceLabel, { color: colors.text }]}>Distance</Text>
+          <Text style={[styles.distanceValue, { color: colors.text }]}>
+            {distanceDisplay}
+          </Text>
+          <Text style={[styles.distanceUnit, { color: colors.text }]}>km</Text>
         </View>
       </View>
     </>
@@ -190,22 +166,84 @@ interface SpeedometerProps {
   speed: number;
   maxSpeed: number;
   color: string;
+  textColor: string;
 }
 
-function Speedometer({ speed, maxSpeed, color }: SpeedometerProps) {
-  const size = 280;
-  const strokeWidth = 20;
+function Speedometer({ speed, maxSpeed, color, textColor }: SpeedometerProps) {
+  const size = 340;
+  const strokeWidth = 24;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   
   const progress = Math.min(speed / maxSpeed, 1);
   const progressOffset = circumference * (1 - progress * 0.75);
 
+  const centerX = size / 2;
+  const centerY = size / 2;
+  
+  const tickMarks = [];
+  const speedLabels = [0, 40, 80, 120, 160, 200];
+  
+  for (let i = 0; i <= 200; i += 10) {
+    const angle = -135 + (i / 200) * 270;
+    const angleRad = (angle * Math.PI) / 180;
+    
+    const isMainTick = i % 40 === 0;
+    const tickLength = isMainTick ? 20 : 12;
+    const tickWidth = isMainTick ? 3 : 2;
+    
+    const innerRadius = radius - tickLength;
+    const outerRadius = radius;
+    
+    const x1 = centerX + innerRadius * Math.cos(angleRad);
+    const y1 = centerY + innerRadius * Math.sin(angleRad);
+    const x2 = centerX + outerRadius * Math.cos(angleRad);
+    const y2 = centerY + outerRadius * Math.sin(angleRad);
+    
+    tickMarks.push(
+      <Line
+        key={`tick-${i}`}
+        x1={x1}
+        y1={y1}
+        x2={x2}
+        y2={y2}
+        stroke={textColor}
+        strokeWidth={tickWidth}
+        opacity={0.6}
+      />
+    );
+  }
+  
+  const speedLabelElements = speedLabels.map((labelSpeed) => {
+    const angle = -135 + (labelSpeed / 200) * 270;
+    const angleRad = (angle * Math.PI) / 180;
+    const labelRadius = radius - 40;
+    
+    const x = centerX + labelRadius * Math.cos(angleRad);
+    const y = centerY + labelRadius * Math.sin(angleRad);
+    
+    return (
+      <SvgText
+        key={`label-${labelSpeed}`}
+        x={x}
+        y={y}
+        fill={textColor}
+        fontSize="16"
+        fontWeight="600"
+        textAnchor="middle"
+        alignmentBaseline="middle"
+        opacity={0.7}
+      >
+        {labelSpeed}
+      </SvgText>
+    );
+  });
+
   return (
     <Svg width={size} height={size} style={styles.speedometer}>
       <Circle
-        cx={size / 2}
-        cy={size / 2}
+        cx={centerX}
+        cy={centerY}
         r={radius}
         stroke="#333"
         strokeWidth={strokeWidth}
@@ -216,8 +254,8 @@ function Speedometer({ speed, maxSpeed, color }: SpeedometerProps) {
       />
       
       <Circle
-        cx={size / 2}
-        cy={size / 2}
+        cx={centerX}
+        cy={centerY}
         r={radius}
         stroke={color}
         strokeWidth={strokeWidth}
@@ -226,6 +264,9 @@ function Speedometer({ speed, maxSpeed, color }: SpeedometerProps) {
         strokeDashoffset={progressOffset - circumference * 0.125}
         strokeLinecap="round"
       />
+      
+      {tickMarks}
+      {speedLabelElements}
     </Svg>
   );
 }
@@ -234,35 +275,33 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "space-between",
+    justifyContent: "space-evenly",
     paddingVertical: 40,
     paddingTop: 60,
   },
   altitudeContainer: {
     alignItems: "center",
-    marginTop: 20,
   },
   altitudeLabel: {
-    fontSize: 14,
+    fontSize: 16,
     opacity: 0.7,
     marginBottom: 4,
   },
   altitudeValue: {
-    fontSize: 24,
-    fontWeight: "600",
+    fontSize: 28,
+    fontWeight: "700",
   },
   altitudeUnit: {
-    fontSize: 14,
+    fontSize: 16,
     opacity: 0.7,
     marginTop: 2,
   },
   speedometerContainer: {
     alignItems: "center",
     justifyContent: "center",
-    flex: 1,
   },
   speedometer: {
-    transform: [{ rotate: "135deg" }],
+    transform: [{ rotate: "0deg" }],
   },
   speedTextContainer: {
     position: "absolute",
@@ -270,54 +309,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   speedValue: {
-    fontSize: 72,
+    fontSize: 96,
     fontWeight: "bold",
+    letterSpacing: -2,
   },
   speedUnit: {
-    fontSize: 20,
+    fontSize: 28,
     opacity: 0.7,
     marginTop: 4,
-  },
-  bottomContainer: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    width: "100%",
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  button: {
-    paddingHorizontal: 24,
-    paddingVertical: 16,
-    borderRadius: 12,
-    minWidth: 100,
-    alignItems: "center",
-  },
-  startButton: {},
-  stopButton: {},
-  disabledButton: {
-    opacity: 0.5,
-  },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "bold",
+    fontWeight: "600",
   },
   distanceContainer: {
     alignItems: "center",
-    flex: 1,
   },
   distanceLabel: {
-    fontSize: 12,
+    fontSize: 16,
     opacity: 0.7,
     marginBottom: 4,
   },
   distanceValue: {
-    fontSize: 32,
+    fontSize: 48,
     fontWeight: "bold",
   },
   distanceUnit: {
-    fontSize: 14,
+    fontSize: 18,
     opacity: 0.7,
     marginTop: 2,
   },
