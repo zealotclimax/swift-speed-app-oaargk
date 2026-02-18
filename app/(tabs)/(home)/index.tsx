@@ -1,6 +1,6 @@
 
 import { useTheme } from "@react-navigation/native";
-import { StyleSheet, View, Text, Alert } from "react-native";
+import { StyleSheet, View, Text, Alert, TouchableOpacity } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import * as Location from "expo-location";
@@ -18,16 +18,14 @@ export default function HomeScreen() {
   const lastPosition = useRef<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
-    console.log("Requesting location permissions and starting tracking");
+    console.log("Requesting location permissions");
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       const permissionGranted = status === "granted";
       setHasPermission(permissionGranted);
       console.log("Location permission granted:", permissionGranted);
       
-      if (permissionGranted) {
-        startTracking();
-      } else {
+      if (!permissionGranted) {
         Alert.alert("Permission Required", "Location permission is required to track speed and distance.");
       }
     })();
@@ -60,7 +58,12 @@ export default function HomeScreen() {
   };
 
   const startTracking = async () => {
-    console.log("Starting GPS tracking");
+    console.log("User tapped Start button - Starting GPS tracking");
+    if (!hasPermission) {
+      Alert.alert("Permission Required", "Location permission is required to track speed and distance.");
+      return;
+    }
+
     setIsTracking(true);
     lastPosition.current = null;
     setDistance(0);
@@ -120,6 +123,20 @@ export default function HomeScreen() {
     }
   };
 
+  const stopTracking = () => {
+    console.log("User tapped Stop button - Stopping GPS tracking");
+    if (locationSubscription.current) {
+      try {
+        locationSubscription.current.remove();
+        locationSubscription.current = null;
+      } catch (error) {
+        console.log("Error removing subscription:", error);
+      }
+    }
+    setIsTracking(false);
+    console.log("Tracking stopped");
+  };
+
   const speedDisplay = speed;
   const altitudeDisplay = altitude;
   const distanceDisplay = (distance / 1000).toFixed(2);
@@ -156,6 +173,24 @@ export default function HomeScreen() {
             {distanceDisplay}
           </Text>
           <Text style={[styles.distanceUnit, { color: colors.text }]}>km</Text>
+        </View>
+
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={[styles.button, styles.startButton, !isTracking && { backgroundColor: '#4CAF50' }]}
+            onPress={startTracking}
+            disabled={isTracking}
+          >
+            <Text style={[styles.buttonText, !isTracking && { color: '#FFFFFF' }]}>START</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.button, styles.stopButton, isTracking && { backgroundColor: '#F44336' }]}
+            onPress={stopTracking}
+            disabled={!isTracking}
+          >
+            <Text style={[styles.buttonText, isTracking && { color: '#FFFFFF' }]}>STOP</Text>
+          </TouchableOpacity>
         </View>
       </View>
     </>
@@ -335,5 +370,33 @@ const styles = StyleSheet.create({
     fontSize: 18,
     opacity: 0.7,
     marginTop: 2,
+  },
+  buttonContainer: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    width: "100%",
+    paddingHorizontal: 20,
+    position: "absolute",
+    bottom: 40,
+  },
+  button: {
+    paddingVertical: 16,
+    paddingHorizontal: 32,
+    borderRadius: 12,
+    minWidth: 120,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: "#333",
+  },
+  startButton: {
+    marginRight: "auto",
+  },
+  stopButton: {
+    marginLeft: "auto",
+  },
+  buttonText: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#666",
   },
 });
