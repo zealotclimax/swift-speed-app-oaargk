@@ -4,7 +4,7 @@ import { StyleSheet, View, Text, Alert, TouchableOpacity } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import * as Location from "expo-location";
-import Svg, { Circle, Line, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Line, Text as SvgText, Path } from "react-native-svg";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -18,14 +18,16 @@ export default function HomeScreen() {
   const lastPosition = useRef<{ latitude: number; longitude: number } | null>(null);
 
   useEffect(() => {
-    console.log("Requesting location permissions");
+    console.log("Requesting location permissions and starting continuous speed tracking");
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       const permissionGranted = status === "granted";
       setHasPermission(permissionGranted);
       console.log("Location permission granted:", permissionGranted);
       
-      if (!permissionGranted) {
+      if (permissionGranted) {
+        startContinuousSpeedTracking();
+      } else {
         Alert.alert("Permission Required", "Location permission is required to track speed and distance.");
       }
     })();
@@ -41,6 +43,59 @@ export default function HomeScreen() {
       }
     };
   }, []);
+
+  const startContinuousSpeedTracking = async () => {
+    console.log("Starting continuous speed tracking");
+    try {
+      locationSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.BestForNavigation,
+          timeInterval: 1000,
+          distanceInterval: 0.5,
+        },
+        (location) => {
+          console.log("Location update:", {
+            speed: location.coords.speed,
+            altitude: location.coords.altitude,
+          });
+          
+          const speedInMps = location.coords.speed !== null && location.coords.speed >= 0 
+            ? location.coords.speed 
+            : 0;
+          const speedInKmh = speedInMps * 3.6;
+          setSpeed(Math.max(0, Math.round(speedInKmh)));
+
+          const altitudeValue = location.coords.altitude || 0;
+          setAltitude(Math.round(altitudeValue));
+
+          if (isTracking && lastPosition.current && speedInMps > 0.5) {
+            const distanceIncrement = calculateDistance(
+              lastPosition.current.latitude,
+              lastPosition.current.longitude,
+              location.coords.latitude,
+              location.coords.longitude
+            );
+            console.log("Distance increment:", distanceIncrement, "meters");
+            setDistance((prev) => {
+              const newDistance = prev + distanceIncrement;
+              console.log("Total distance:", newDistance / 1000, "km");
+              return newDistance;
+            });
+          }
+
+          if (isTracking) {
+            lastPosition.current = {
+              latitude: location.coords.latitude,
+              longitude: location.coords.longitude,
+            };
+          }
+        }
+      );
+      console.log("Continuous speed tracking started successfully");
+    } catch (error) {
+      console.error("Error starting continuous speed tracking:", error);
+    }
+  };
 
   const calculateDistance = (lat1: number, lon1: number, lat2: number, lon2: number) => {
     const R = 6371e3;
@@ -58,7 +113,7 @@ export default function HomeScreen() {
   };
 
   const startTracking = async () => {
-    console.log("User tapped Start button - Starting GPS tracking");
+    console.log("User tapped Start button - Starting distance tracking");
     if (!hasPermission) {
       Alert.alert("Permission Required", "Location permission is required to track speed and distance.");
       return;
@@ -67,74 +122,13 @@ export default function HomeScreen() {
     setIsTracking(true);
     lastPosition.current = null;
     setDistance(0);
-    setSpeed(0);
-
-    try {
-      locationSubscription.current = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.BestForNavigation,
-          timeInterval: 1000,
-          distanceInterval: 0.5,
-        },
-        (location) => {
-          console.log("Location update:", {
-            speed: location.coords.speed,
-            altitude: location.coords.altitude,
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          });
-          
-          const speedInMps = location.coords.speed !== null && location.coords.speed >= 0 
-            ? location.coords.speed 
-            : 0;
-          const speedInKmh = speedInMps * 3.6;
-          setSpeed(Math.max(0, Math.round(speedInKmh)));
-          console.log("Speed calculated:", speedInKmh, "km/h");
-
-          const altitudeValue = location.coords.altitude || 0;
-          setAltitude(Math.round(altitudeValue));
-
-          if (lastPosition.current && speedInMps > 0.5) {
-            const distanceIncrement = calculateDistance(
-              lastPosition.current.latitude,
-              lastPosition.current.longitude,
-              location.coords.latitude,
-              location.coords.longitude
-            );
-            console.log("Distance increment:", distanceIncrement, "meters");
-            setDistance((prev) => {
-              const newDistance = prev + distanceIncrement;
-              console.log("Total distance:", newDistance / 1000, "km");
-              return newDistance;
-            });
-          }
-
-          lastPosition.current = {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          };
-        }
-      );
-      console.log("Location tracking started successfully");
-    } catch (error) {
-      console.error("Error starting location tracking:", error);
-      Alert.alert("Error", "Failed to start GPS tracking");
-      setIsTracking(false);
-    }
   };
 
   const stopTracking = () => {
-    console.log("User tapped Stop button - Stopping GPS tracking");
-    if (locationSubscription.current) {
-      try {
-        locationSubscription.current.remove();
-        locationSubscription.current = null;
-      } catch (error) {
-        console.log("Error removing subscription:", error);
-      }
-    }
+    console.log("User tapped Stop button - Stopping distance tracking");
     setIsTracking(false);
-    console.log("Tracking stopped");
+    lastPosition.current = null;
+    console.log("Distance tracking stopped");
   };
 
   const speedDisplay = speed;
@@ -158,7 +152,7 @@ export default function HomeScreen() {
         </View>
 
         <View style={styles.speedometerContainer}>
-          <Speedometer speed={speedDisplay} maxSpeed={200} color={colors.primary} textColor={colors.text} />
+          <Speedometer speed={speedDisplay} maxSpeed={150} color={colors.primary} textColor={colors.text} />
           <View style={styles.speedTextContainer}>
             <Text style={[styles.speedValue, { color: colors.text }]}>
               {speedDisplay}
@@ -205,26 +199,29 @@ interface SpeedometerProps {
 }
 
 function Speedometer({ speed, maxSpeed, color, textColor }: SpeedometerProps) {
-  const size = 340;
-  const strokeWidth = 24;
+  const size = 360;
+  const strokeWidth = 28;
   const radius = (size - strokeWidth) / 2;
   const circumference = 2 * Math.PI * radius;
   
+  const startAngle = 210;
+  const endAngle = 330;
+  const angleRange = endAngle - startAngle + 360;
+  
   const progress = Math.min(speed / maxSpeed, 1);
-  const progressOffset = circumference * (1 - progress * 0.75);
 
   const centerX = size / 2;
   const centerY = size / 2;
   
   const tickMarks = [];
-  const speedLabels = [0, 40, 80, 120, 160, 200];
+  const speedLabels = [0, 30, 60, 90, 120, 150];
   
-  for (let i = 0; i <= 200; i += 10) {
-    const angle = -135 + (i / 200) * 270;
+  for (let i = 0; i <= 150; i += 10) {
+    const angle = startAngle + (i / 150) * angleRange;
     const angleRad = (angle * Math.PI) / 180;
     
-    const isMainTick = i % 40 === 0;
-    const tickLength = isMainTick ? 20 : 12;
+    const isMainTick = i % 30 === 0;
+    const tickLength = isMainTick ? 24 : 14;
     const tickWidth = isMainTick ? 3 : 2;
     
     const innerRadius = radius - tickLength;
@@ -250,9 +247,9 @@ function Speedometer({ speed, maxSpeed, color, textColor }: SpeedometerProps) {
   }
   
   const speedLabelElements = speedLabels.map((labelSpeed) => {
-    const angle = -135 + (labelSpeed / 200) * 270;
+    const angle = startAngle + (labelSpeed / 150) * angleRange;
     const angleRad = (angle * Math.PI) / 180;
-    const labelRadius = radius - 40;
+    const labelRadius = radius - 45;
     
     const x = centerX + labelRadius * Math.cos(angleRad);
     const y = centerY + labelRadius * Math.sin(angleRad);
@@ -263,40 +260,59 @@ function Speedometer({ speed, maxSpeed, color, textColor }: SpeedometerProps) {
         x={x}
         y={y}
         fill={textColor}
-        fontSize="16"
-        fontWeight="600"
+        fontSize="18"
+        fontWeight="700"
         textAnchor="middle"
         alignmentBaseline="middle"
-        opacity={0.7}
+        opacity={0.8}
       >
         {labelSpeed}
       </SvgText>
     );
   });
 
+  const polarToCartesian = (centerX: number, centerY: number, radius: number, angleInDegrees: number) => {
+    const angleInRadians = (angleInDegrees * Math.PI) / 180.0;
+    return {
+      x: centerX + radius * Math.cos(angleInRadians),
+      y: centerY + radius * Math.sin(angleInRadians),
+    };
+  };
+
+  const describeArc = (x: number, y: number, radius: number, startAngle: number, endAngle: number) => {
+    const start = polarToCartesian(x, y, radius, endAngle);
+    const end = polarToCartesian(x, y, radius, startAngle);
+    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
+    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
+  };
+
+  const backgroundPath = describeArc(centerX, centerY, radius, startAngle, endAngle);
+
+  const getSpeedColor = (currentSpeed: number) => {
+    if (currentSpeed <= 40) return '#4CAF50';
+    if (currentSpeed <= 110) return '#FFC107';
+    return '#F44336';
+  };
+
+  const currentSpeedAngle = startAngle + progress * angleRange;
+  const progressPath = describeArc(centerX, centerY, radius, startAngle, currentSpeedAngle);
+  const speedColor = getSpeedColor(speed);
+
   return (
     <Svg width={size} height={size} style={styles.speedometer}>
-      <Circle
-        cx={centerX}
-        cy={centerY}
-        r={radius}
+      <Path
+        d={backgroundPath}
         stroke="#333"
         strokeWidth={strokeWidth}
         fill="none"
-        strokeDasharray={`${circumference * 0.75} ${circumference}`}
-        strokeDashoffset={-circumference * 0.125}
         strokeLinecap="round"
       />
       
-      <Circle
-        cx={centerX}
-        cy={centerY}
-        r={radius}
-        stroke={color}
+      <Path
+        d={progressPath}
+        stroke={speedColor}
         strokeWidth={strokeWidth}
         fill="none"
-        strokeDasharray={`${circumference * 0.75} ${circumference}`}
-        strokeDashoffset={progressOffset - circumference * 0.125}
         strokeLinecap="round"
       />
       
@@ -344,12 +360,12 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   speedValue: {
-    fontSize: 96,
+    fontSize: 110,
     fontWeight: "bold",
-    letterSpacing: -2,
+    letterSpacing: -3,
   },
   speedUnit: {
-    fontSize: 28,
+    fontSize: 32,
     opacity: 0.7,
     marginTop: 4,
     fontWeight: "600",
