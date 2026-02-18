@@ -4,7 +4,6 @@ import { StyleSheet, View, Text, Alert, TouchableOpacity } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import * as Location from "expo-location";
-import Svg, { Circle, Line, Text as SvgText, Path } from "react-native-svg";
 
 export default function HomeScreen() {
   const { colors } = useTheme();
@@ -151,14 +150,11 @@ export default function HomeScreen() {
           <Text style={[styles.altitudeUnit, { color: colors.text }]}>m</Text>
         </View>
 
-        <View style={styles.speedometerContainer}>
-          <Speedometer speed={speedDisplay} maxSpeed={150} color={colors.primary} textColor={colors.text} />
-          <View style={styles.speedTextContainer}>
-            <Text style={[styles.speedValue, { color: colors.text }]}>
-              {speedDisplay}
-            </Text>
-            <Text style={[styles.speedUnit, { color: colors.text }]}>km/h</Text>
-          </View>
+        <View style={styles.speedContainer}>
+          <Text style={[styles.speedValue, { color: colors.text }]}>
+            {speedDisplay}
+          </Text>
+          <Text style={[styles.speedUnit, { color: colors.text }]}>km/h</Text>
         </View>
 
         <View style={styles.distanceContainer}>
@@ -191,137 +187,6 @@ export default function HomeScreen() {
   );
 }
 
-interface SpeedometerProps {
-  speed: number;
-  maxSpeed: number;
-  color: string;
-  textColor: string;
-}
-
-function Speedometer({ speed, maxSpeed, color, textColor }: SpeedometerProps) {
-  const size = 360;
-  const strokeWidth = 28;
-  const radius = (size - strokeWidth) / 2;
-  const circumference = 2 * Math.PI * radius;
-  
-  const startAngle = 210;
-  const endAngle = 330;
-  const angleRange = endAngle - startAngle + 360;
-  
-  const progress = Math.min(speed / maxSpeed, 1);
-
-  const centerX = size / 2;
-  const centerY = size / 2;
-  
-  const tickMarks = [];
-  const speedLabels = [0, 30, 60, 90, 120, 150];
-  
-  for (let i = 0; i <= 150; i += 10) {
-    const angle = startAngle + (i / 150) * angleRange;
-    const angleRad = (angle * Math.PI) / 180;
-    
-    const isMainTick = i % 30 === 0;
-    const tickLength = isMainTick ? 24 : 14;
-    const tickWidth = isMainTick ? 3 : 2;
-    
-    const innerRadius = radius - tickLength;
-    const outerRadius = radius;
-    
-    const x1 = centerX + innerRadius * Math.cos(angleRad);
-    const y1 = centerY + innerRadius * Math.sin(angleRad);
-    const x2 = centerX + outerRadius * Math.cos(angleRad);
-    const y2 = centerY + outerRadius * Math.sin(angleRad);
-    
-    tickMarks.push(
-      <Line
-        key={`tick-${i}`}
-        x1={x1}
-        y1={y1}
-        x2={x2}
-        y2={y2}
-        stroke={textColor}
-        strokeWidth={tickWidth}
-        opacity={0.6}
-      />
-    );
-  }
-  
-  const speedLabelElements = speedLabels.map((labelSpeed) => {
-    const angle = startAngle + (labelSpeed / 150) * angleRange;
-    const angleRad = (angle * Math.PI) / 180;
-    const labelRadius = radius - 45;
-    
-    const x = centerX + labelRadius * Math.cos(angleRad);
-    const y = centerY + labelRadius * Math.sin(angleRad);
-    
-    return (
-      <SvgText
-        key={`label-${labelSpeed}`}
-        x={x}
-        y={y}
-        fill={textColor}
-        fontSize="18"
-        fontWeight="700"
-        textAnchor="middle"
-        alignmentBaseline="middle"
-        opacity={0.8}
-      >
-        {labelSpeed}
-      </SvgText>
-    );
-  });
-
-  const polarToCartesian = (centerX: number, centerY: number, radius: number, angleInDegrees: number) => {
-    const angleInRadians = (angleInDegrees * Math.PI) / 180.0;
-    return {
-      x: centerX + radius * Math.cos(angleInRadians),
-      y: centerY + radius * Math.sin(angleInRadians),
-    };
-  };
-
-  const describeArc = (x: number, y: number, radius: number, startAngle: number, endAngle: number) => {
-    const start = polarToCartesian(x, y, radius, endAngle);
-    const end = polarToCartesian(x, y, radius, startAngle);
-    const largeArcFlag = endAngle - startAngle <= 180 ? '0' : '1';
-    return `M ${start.x} ${start.y} A ${radius} ${radius} 0 ${largeArcFlag} 0 ${end.x} ${end.y}`;
-  };
-
-  const backgroundPath = describeArc(centerX, centerY, radius, startAngle, endAngle);
-
-  const getSpeedColor = (currentSpeed: number) => {
-    if (currentSpeed <= 40) return '#4CAF50';
-    if (currentSpeed <= 110) return '#FFC107';
-    return '#F44336';
-  };
-
-  const currentSpeedAngle = startAngle + progress * angleRange;
-  const progressPath = describeArc(centerX, centerY, radius, startAngle, currentSpeedAngle);
-  const speedColor = getSpeedColor(speed);
-
-  return (
-    <Svg width={size} height={size} style={styles.speedometer}>
-      <Path
-        d={backgroundPath}
-        stroke="#333"
-        strokeWidth={strokeWidth}
-        fill="none"
-        strokeLinecap="round"
-      />
-      
-      <Path
-        d={progressPath}
-        stroke={speedColor}
-        strokeWidth={strokeWidth}
-        fill="none"
-        strokeLinecap="round"
-      />
-      
-      {tickMarks}
-      {speedLabelElements}
-    </Svg>
-  );
-}
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -347,27 +212,21 @@ const styles = StyleSheet.create({
     opacity: 0.7,
     marginTop: 2,
   },
-  speedometerContainer: {
+  speedContainer: {
     alignItems: "center",
     justifyContent: "center",
-  },
-  speedometer: {
-    transform: [{ rotate: "0deg" }],
-  },
-  speedTextContainer: {
-    position: "absolute",
-    alignItems: "center",
-    justifyContent: "center",
+    flex: 1,
   },
   speedValue: {
-    fontSize: 110,
+    fontSize: 200,
     fontWeight: "bold",
-    letterSpacing: -3,
+    letterSpacing: -8,
+    lineHeight: 220,
   },
   speedUnit: {
-    fontSize: 32,
+    fontSize: 48,
     opacity: 0.7,
-    marginTop: 4,
+    marginTop: 8,
     fontWeight: "600",
   },
   distanceContainer: {
