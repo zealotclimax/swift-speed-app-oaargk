@@ -220,12 +220,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     alignItems: "center",
-    justifyContent: "space-evenly",
-    paddingVertical: 40,
     paddingTop: 60,
+    paddingBottom: 140,
   },
   altitudeContainer: {
     alignItems: "center",
+    marginTop: 20,
   },
   altitudeLabel: {
     fontSize: 16,
@@ -244,7 +244,8 @@ const styles = StyleSheet.create({
   speedContainer: {
     alignItems: "center",
     justifyContent: "center",
-    flex: 1,
+    marginTop: 40,
+    marginBottom: 40,
   },
   speedValue: {
     fontSize: 200,
@@ -264,6 +265,7 @@ const styles = StyleSheet.create({
     width: "100%",
     paddingHorizontal: 20,
     gap: 20,
+    marginTop: 60,
   },
   statBox: {
     flex: 1,
