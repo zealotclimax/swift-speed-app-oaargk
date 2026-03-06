@@ -1,7 +1,7 @@
 {
   "expo": {
     "name": "Swift Speed",
-    "slug": "Swift Speed",
+    "slug": "swift-speed",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/app-icon-off.png",
@@ -36,7 +36,7 @@
       "expo-router",
       "expo-web-browser"
     ],
-    "scheme": "Swift Speed",
+    "scheme": "swiftspeed",
     "experiments": {
       "typedRoutes": true
     },

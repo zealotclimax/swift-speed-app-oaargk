@@ -10,11 +10,13 @@ export default function HomeScreen() {
   const [speed, setSpeed] = useState(0);
   const [altitude, setAltitude] = useState(0);
   const [distance, setDistance] = useState(0);
+  const [altitudeGain, setAltitudeGain] = useState(0);
   const [isTracking, setIsTracking] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
   
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const lastPosition = useRef<{ latitude: number; longitude: number } | null>(null);
+  const lastAltitude = useRef<number | null>(null);
 
   useEffect(() => {
     console.log("Requesting location permissions and starting continuous speed tracking");
@@ -82,11 +84,24 @@ export default function HomeScreen() {
             });
           }
 
+          if (isTracking && lastAltitude.current !== null) {
+            const altitudeDifference = altitudeValue - lastAltitude.current;
+            if (altitudeDifference > 0) {
+              console.log("Altitude gain:", altitudeDifference, "meters");
+              setAltitudeGain((prev) => {
+                const newGain = prev + altitudeDifference;
+                console.log("Total altitude gain:", newGain, "meters");
+                return newGain;
+              });
+            }
+          }
+
           if (isTracking) {
             lastPosition.current = {
               latitude: location.coords.latitude,
               longitude: location.coords.longitude,
             };
+            lastAltitude.current = altitudeValue;
           }
         }
       );
@@ -120,19 +135,23 @@ export default function HomeScreen() {
 
     setIsTracking(true);
     lastPosition.current = null;
+    lastAltitude.current = null;
     setDistance(0);
+    setAltitudeGain(0);
   };
 
   const stopTracking = () => {
     console.log("User tapped Stop button - Stopping distance tracking");
     setIsTracking(false);
     lastPosition.current = null;
+    lastAltitude.current = null;
     console.log("Distance tracking stopped");
   };
 
   const speedDisplay = speed;
   const altitudeDisplay = altitude;
   const distanceDisplay = (distance / 1000).toFixed(2);
+  const altitudeGainDisplay = Math.round(altitudeGain);
 
   return (
     <>
@@ -157,12 +176,22 @@ export default function HomeScreen() {
           <Text style={[styles.speedUnit, { color: colors.text }]}>km/h</Text>
         </View>
 
-        <View style={styles.distanceContainer}>
-          <Text style={[styles.distanceLabel, { color: colors.text }]}>Distance</Text>
-          <Text style={[styles.distanceValue, { color: colors.text }]}>
-            {distanceDisplay}
-          </Text>
-          <Text style={[styles.distanceUnit, { color: colors.text }]}>km</Text>
+        <View style={styles.statsContainer}>
+          <View style={styles.statBox}>
+            <Text style={[styles.statLabel, { color: colors.text }]}>Distance</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>
+              {distanceDisplay}
+            </Text>
+            <Text style={[styles.statUnit, { color: colors.text }]}>km</Text>
+          </View>
+
+          <View style={styles.statBox}>
+            <Text style={[styles.statLabel, { color: colors.text }]}>Altitude Gain</Text>
+            <Text style={[styles.statValue, { color: colors.text }]}>
+              {altitudeGainDisplay}
+            </Text>
+            <Text style={[styles.statUnit, { color: colors.text }]}>m</Text>
+          </View>
         </View>
 
         <View style={styles.buttonContainer}>
@@ -229,20 +258,29 @@ const styles = StyleSheet.create({
     marginTop: 8,
     fontWeight: "600",
   },
-  distanceContainer: {
-    alignItems: "center",
+  statsContainer: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    width: "100%",
+    paddingHorizontal: 20,
+    gap: 20,
   },
-  distanceLabel: {
-    fontSize: 16,
+  statBox: {
+    flex: 1,
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  statLabel: {
+    fontSize: 14,
     opacity: 0.7,
     marginBottom: 4,
   },
-  distanceValue: {
-    fontSize: 48,
+  statValue: {
+    fontSize: 36,
     fontWeight: "bold",
   },
-  distanceUnit: {
-    fontSize: 18,
+  statUnit: {
+    fontSize: 14,
     opacity: 0.7,
     marginTop: 2,
   },
