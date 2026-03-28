@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Swift Speed",
+    "name": "Simple Speed",
     "slug": "swift-speed",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -41,7 +41,8 @@
       "typedRoutes": true
     },
     "extra": {
-      "router": {}
+      "router": {},
+      "backendUrl": "https://hbyf3kz8mawpdtymxg6b3bzznmmt7nr7.app.specular.dev"
     }
   }
 }
