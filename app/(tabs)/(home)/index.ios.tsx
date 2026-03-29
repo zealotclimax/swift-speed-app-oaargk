@@ -4,7 +4,7 @@ import { StyleSheet, View, Text, Alert, TouchableOpacity, Platform } from "react
 import React, { useState, useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import * as Location from "expo-location";
-import { useKeepAwake } from "expo-keep-awake";
+import * as ExpoKeepAwake from "expo-keep-awake";
 
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === "web") {
@@ -15,7 +15,13 @@ const showAlert = (title: string, message: string) => {
 };
 
 export default function HomeScreen() {
-  useKeepAwake();
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    ExpoKeepAwake.activateKeepAwakeAsync();
+    return () => {
+      ExpoKeepAwake.deactivateKeepAwake();
+    };
+  }, []);
   const { colors } = useTheme();
   const [speed, setSpeed] = useState(0);
   const [altitude, setAltitude] = useState(0);
