@@ -1,10 +1,18 @@
 
 import { useTheme } from "@react-navigation/native";
-import { StyleSheet, View, Text, Alert, TouchableOpacity } from "react-native";
+import { StyleSheet, View, Text, Alert, TouchableOpacity, Platform } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import * as Location from "expo-location";
 import { useKeepAwake } from "expo-keep-awake";
+
+const showAlert = (title: string, message: string) => {
+  if (Platform.OS === "web") {
+    window.alert(`${title}: ${message}`);
+  } else {
+    Alert.alert(title, message);
+  }
+};
 
 export default function HomeScreen() {
   useKeepAwake();
@@ -15,23 +23,31 @@ export default function HomeScreen() {
   const [altitudeGain, setAltitudeGain] = useState(0);
   const [isTracking, setIsTracking] = useState(false);
   const [hasPermission, setHasPermission] = useState(false);
-  
+
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const lastPosition = useRef<{ latitude: number; longitude: number } | null>(null);
   const lastAltitude = useRef<number | null>(null);
+  const isTrackingRef = useRef(false);
+
+  // Keep ref in sync with state so location callbacks always see current value
+  useEffect(() => {
+    isTrackingRef.current = isTracking;
+  }, [isTracking]);
 
   useEffect(() => {
+    if (Platform.OS === "web") return;
+
     console.log("Requesting location permissions and starting continuous speed tracking");
     (async () => {
       const { status } = await Location.requestForegroundPermissionsAsync();
       const permissionGranted = status === "granted";
       setHasPermission(permissionGranted);
       console.log("Location permission granted:", permissionGranted);
-      
+
       if (permissionGranted) {
         startContinuousSpeedTracking();
       } else {
-        Alert.alert("Permission Required", "Location permission is required to track speed and distance.");
+        showAlert("Permission Required", "Location permission is required to track speed and distance.");
       }
     })();
 
@@ -61,9 +77,9 @@ export default function HomeScreen() {
             speed: location.coords.speed,
             altitude: location.coords.altitude,
           });
-          
-          const speedInMps = location.coords.speed !== null && location.coords.speed >= 0 
-            ? location.coords.speed 
+
+          const speedInMps = location.coords.speed !== null && location.coords.speed >= 0
+            ? location.coords.speed
             : 0;
           const speedInKmh = speedInMps * 3.6;
           setSpeed(Math.max(0, Math.round(speedInKmh)));
@@ -71,7 +87,7 @@ export default function HomeScreen() {
           const altitudeValue = location.coords.altitude || 0;
           setAltitude(Math.round(altitudeValue));
 
-          if (isTracking && lastPosition.current && speedInMps > 0.5) {
+          if (isTrackingRef.current && lastPosition.current && speedInMps > 0.5) {
             const distanceIncrement = calculateDistance(
               lastPosition.current.latitude,
               lastPosition.current.longitude,
@@ -86,7 +102,7 @@ export default function HomeScreen() {
             });
           }
 
-          if (isTracking && lastAltitude.current !== null) {
+          if (isTrackingRef.current && lastAltitude.current !== null) {
             const altitudeDifference = altitudeValue - lastAltitude.current;
             if (altitudeDifference > 1) {
               console.log("Altitude gain:", altitudeDifference, "meters");
@@ -130,8 +146,8 @@ export default function HomeScreen() {
 
   const startTracking = async () => {
     console.log("User tapped Start button - Starting distance tracking");
-    if (!hasPermission) {
-      Alert.alert("Permission Required", "Location permission is required to track speed and distance.");
+    if (!hasPermission && Platform.OS !== "web") {
+      showAlert("Permission Required", "Location permission is required to track speed and distance.");
       return;
     }
 
