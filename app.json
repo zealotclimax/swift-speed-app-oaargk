@@ -1,14 +1,14 @@
 {
   "expo": {
-    "name": "Simple Speed",
+    "name": "Swift Speed",
     "slug": "swift-speed",
     "version": "1.0.0",
     "orientation": "portrait",
-    "icon": "./assets/images/app-icon-off.png",
+    "icon": "./assets/images/Bike3.png",
     "userInterfaceStyle": "automatic",
     "newArchEnabled": true,
     "splash": {
-      "image": "./assets/images/app-icon-off.png",
+      "image": "./assets/images/Bike3.png",
       "resizeMode": "contain",
       "backgroundColor": "#000000"
     },
@@ -21,7 +21,7 @@
     },
     "android": {
       "adaptiveIcon": {
-        "foregroundImage": "./assets/images/app-icon-off.png",
+        "foregroundImage": "./assets/images/Bike3.png",
         "backgroundColor": "#000000"
       },
       "edgeToEdgeEnabled": true,
