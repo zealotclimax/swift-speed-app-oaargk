@@ -2,9 +2,12 @@
 import { useTheme } from "@react-navigation/native";
 import { StyleSheet, View, Text, Alert, TouchableOpacity, Platform } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
-import { Stack } from "expo-router";
+import { Stack, useRouter } from "expo-router";
 import * as Location from "expo-location";
 import * as ExpoKeepAwake from "expo-keep-awake";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+
+const HISTORY_KEY = "swift_speed_history";
 
 const showAlert = (title: string, message: string) => {
   if (Platform.OS === "web") {
@@ -23,6 +26,7 @@ export default function HomeScreen() {
     };
   }, []);
   const { colors } = useTheme();
+  const router = useRouter();
   const [speed, setSpeed] = useState(0);
   const [altitude, setAltitude] = useState(0);
   const [distance, setDistance] = useState(0);
@@ -34,11 +38,21 @@ export default function HomeScreen() {
   const lastPosition = useRef<{ latitude: number; longitude: number } | null>(null);
   const lastAltitude = useRef<number | null>(null);
   const isTrackingRef = useRef(false);
+  const distanceRef = useRef(0);
+  const altitudeGainRef = useRef(0);
 
-  // Keep ref in sync with state so location callbacks always see current value
+  // Keep refs in sync with state so stopTracking can read latest values
   useEffect(() => {
     isTrackingRef.current = isTracking;
   }, [isTracking]);
+
+  useEffect(() => {
+    distanceRef.current = distance;
+  }, [distance]);
+
+  useEffect(() => {
+    altitudeGainRef.current = altitudeGain;
+  }, [altitudeGain]);
 
   useEffect(() => {
     if (Platform.OS === "web") return;
@@ -164,12 +178,41 @@ export default function HomeScreen() {
     setAltitudeGain(0);
   };
 
-  const stopTracking = () => {
+  const stopTracking = async () => {
     console.log("User tapped Stop button - Stopping distance tracking");
+    const finalDistance = distanceRef.current;
+    const finalAltitudeGain = altitudeGainRef.current;
+
     setIsTracking(false);
     lastPosition.current = null;
     lastAltitude.current = null;
-    console.log("Distance tracking stopped");
+    console.log("Distance tracking stopped. Final distance:", finalDistance / 1000, "km, altitude gain:", finalAltitudeGain, "m");
+
+    if (finalDistance > 0) {
+      try {
+        const record = {
+          id: Date.now().toString(),
+          date: new Date().toISOString(),
+          distance: finalDistance,
+          altitudeGain: finalAltitudeGain,
+        };
+        console.log("Saving session to history:", record);
+        const existing = await AsyncStorage.getItem(HISTORY_KEY);
+        const history = existing ? JSON.parse(existing) : [];
+        const updated = [record, ...history].slice(0, 20);
+        await AsyncStorage.setItem(HISTORY_KEY, JSON.stringify(updated));
+        console.log("Session saved to history. Total records:", updated.length);
+      } catch (error) {
+        console.error("Error saving session to history:", error);
+      }
+    } else {
+      console.log("Session not saved - distance was 0");
+    }
+  };
+
+  const handleHistoryPress = () => {
+    console.log("User tapped History button - navigating to /history");
+    router.push("/history");
   };
 
   const speedDisplay = speed;
@@ -185,6 +228,13 @@ export default function HomeScreen() {
         }}
       />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <TouchableOpacity
+          style={[styles.historyButton, { backgroundColor: colors.card }]}
+          onPress={handleHistoryPress}
+        >
+          <Text style={[styles.historyButtonText, { color: colors.text }]}>History</Text>
+        </TouchableOpacity>
+
         <View style={styles.altitudeContainer}>
           <Text style={[styles.altitudeLabel, { color: colors.text }]}>Altitude</Text>
           <Text style={[styles.altitudeValue, { color: colors.text }]}>
@@ -246,6 +296,20 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingTop: 60,
     paddingBottom: 140,
+  },
+  historyButton: {
+    position: "absolute",
+    top: 60,
+    right: 20,
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 16,
+    opacity: 0.85,
+    zIndex: 10,
+  },
+  historyButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
   },
   altitudeContainer: {
     alignItems: "center",

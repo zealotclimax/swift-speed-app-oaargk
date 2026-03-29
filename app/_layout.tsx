@@ -88,6 +88,7 @@ export default function RootLayout() {
             <Stack>
               {/* Main app with tabs */}
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
+              <Stack.Screen name="history" options={{ headerShown: true, title: "History" }} />
             </Stack>
             <SystemBars style={"auto"} />
             </GestureHandlerRootView>
