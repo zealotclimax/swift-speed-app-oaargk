@@ -4,8 +4,10 @@ import { StyleSheet, View, Text, Alert, TouchableOpacity } from "react-native";
 import React, { useState, useEffect, useRef } from "react";
 import { Stack } from "expo-router";
 import * as Location from "expo-location";
+import { useKeepAwake } from "expo-keep-awake";
 
 export default function HomeScreen() {
+  useKeepAwake();
   const { colors } = useTheme();
   const [speed, setSpeed] = useState(0);
   const [altitude, setAltitude] = useState(0);
@@ -86,7 +88,7 @@ export default function HomeScreen() {
 
           if (isTracking && lastAltitude.current !== null) {
             const altitudeDifference = altitudeValue - lastAltitude.current;
-            if (altitudeDifference > 0) {
+            if (altitudeDifference > 1) {
               console.log("Altitude gain:", altitudeDifference, "meters");
               setAltitudeGain((prev) => {
                 const newGain = prev + altitudeDifference;
@@ -96,13 +98,13 @@ export default function HomeScreen() {
             }
           }
 
-          if (isTracking) {
-            lastPosition.current = {
-              latitude: location.coords.latitude,
-              longitude: location.coords.longitude,
-            };
-            lastAltitude.current = altitudeValue;
-          }
+          // Always update lastPosition and lastAltitude on every tick so the
+          // first movement after pressing Start has a valid previous position.
+          lastPosition.current = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+          lastAltitude.current = altitudeValue;
         }
       );
       console.log("Continuous speed tracking started successfully");
