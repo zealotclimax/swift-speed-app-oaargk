@@ -51,18 +51,32 @@ export default function HistoryScreen() {
   const { colors } = useTheme();
   const [history, setHistory] = useState<SessionRecord[]>([]);
 
+  const MAX_RECORDS = 5;
+
   const loadHistory = useCallback(async () => {
     console.log("Loading session history from AsyncStorage");
     try {
       const stored = await AsyncStorage.getItem(HISTORY_KEY);
       const parsed: SessionRecord[] = stored ? JSON.parse(stored) : [];
-      setHistory(parsed);
-      console.log("Loaded", parsed.length, "history records");
+      const limited = parsed.slice(-MAX_RECORDS).reverse();
+      setHistory(limited);
+      console.log("Loaded", parsed.length, "history records, displaying", limited.length);
     } catch (error) {
       console.error("Error loading history:", error);
       setHistory([]);
     }
   }, []);
+
+  const clearHistory = async () => {
+    console.log("User tapped Clear All — deleting all history from AsyncStorage");
+    try {
+      await AsyncStorage.removeItem(HISTORY_KEY);
+      setHistory([]);
+      console.log("History cleared successfully");
+    } catch (error) {
+      console.error("Error clearing history:", error);
+    }
+  };
 
   useFocusEffect(
     useCallback(() => {
@@ -120,6 +134,16 @@ export default function HistoryScreen() {
         keyExtractor={(item) => item.id}
         renderItem={renderItem}
         ListEmptyComponent={emptyComponent}
+        ListFooterComponent={
+          history.length > 0 ? (
+            <TouchableOpacity
+              style={[styles.clearButton, { borderColor: colors.border }]}
+              onPress={clearHistory}
+            >
+              <Text style={styles.clearButtonText}>Clear All</Text>
+            </TouchableOpacity>
+          ) : null
+        }
         contentContainerStyle={[
           styles.listContent,
           { backgroundColor: colors.background },
@@ -197,5 +221,17 @@ const styles = StyleSheet.create({
   backButtonText: {
     fontSize: 17,
     fontWeight: "400",
+  },
+  clearButton: {
+    marginTop: 8,
+    paddingVertical: 14,
+    borderRadius: 12,
+    borderWidth: 1,
+    alignItems: "center",
+  },
+  clearButtonText: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: "#FF3B30",
   },
 });
