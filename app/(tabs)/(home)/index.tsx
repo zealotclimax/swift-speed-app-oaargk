@@ -36,7 +36,7 @@ export default function HomeScreen() {
 
   const locationSubscription = useRef<Location.LocationSubscription | null>(null);
   const lastPosition = useRef<{ latitude: number; longitude: number } | null>(null);
-  const lastAltitude = useRef<number | null>(null);
+  const prevAltitudeRef = useRef<number | null>(null);
   const isTrackingRef = useRef(false);
   const distanceRef = useRef(0);
   const altitudeGainRef = useRef(0);
@@ -122,25 +122,25 @@ export default function HomeScreen() {
             });
           }
 
-          if (isTrackingRef.current && lastAltitude.current !== null) {
-            const altitudeDifference = altitudeValue - lastAltitude.current;
-            if (altitudeDifference > 1) {
-              console.log("Altitude gain:", altitudeDifference, "meters");
-              setAltitudeGain((prev) => {
-                const newGain = prev + altitudeDifference;
-                console.log("Total altitude gain:", newGain, "meters");
-                return newGain;
-              });
+          if (isTrackingRef.current) {
+            if (prevAltitudeRef.current !== null) {
+              const altitudeDifference = altitudeValue - prevAltitudeRef.current;
+              if (altitudeDifference > 0.5) {
+                const newGain = altitudeGainRef.current + altitudeDifference;
+                altitudeGainRef.current = newGain;
+                setAltitudeGain(newGain);
+                console.log("Altitude gain increment:", altitudeDifference, "meters. Total altitude gain:", newGain, "meters");
+              }
             }
+            prevAltitudeRef.current = altitudeValue;
           }
 
-          // Always update lastPosition and lastAltitude on every tick so the
+          // Always update lastPosition on every tick so the
           // first movement after pressing Start has a valid previous position.
           lastPosition.current = {
             latitude: location.coords.latitude,
             longitude: location.coords.longitude,
           };
-          lastAltitude.current = altitudeValue;
         }
       );
       console.log("Continuous speed tracking started successfully");
@@ -173,7 +173,9 @@ export default function HomeScreen() {
 
     setIsTracking(true);
     lastPosition.current = null;
-    lastAltitude.current = null;
+    prevAltitudeRef.current = null;
+    distanceRef.current = 0;
+    altitudeGainRef.current = 0;
     setDistance(0);
     setAltitudeGain(0);
   };
@@ -185,7 +187,7 @@ export default function HomeScreen() {
 
     setIsTracking(false);
     lastPosition.current = null;
-    lastAltitude.current = null;
+    prevAltitudeRef.current = null;
     console.log("Distance tracking stopped. Final distance:", finalDistance / 1000, "km, altitude gain:", finalAltitudeGain, "m");
 
     if (finalDistance > 0) {
